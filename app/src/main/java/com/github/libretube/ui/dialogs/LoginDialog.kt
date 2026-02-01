@@ -28,6 +28,37 @@ import kotlinx.coroutines.withContext
 import retrofit2.HttpException
 
 class LoginDialog : DialogFragment() {
+    private val googleSignInLauncher = registerForActivityResult(androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val task = com.google.android.gms.auth.api.signin.GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val token = com.github.libretube.helpers.GoogleAuthManager.getAccessToken(requireContext())
+                    if (token != null) {
+                        PreferenceHelper.setToken(token)
+                        PreferenceHelper.setUsername(account.displayName ?: account.email ?: "Google User")
+                        PreferenceHelper.setAccountType(com.github.libretube.enums.AccountType.GOOGLE)
+
+                        withContext(Dispatchers.Main) {
+                            context?.toastFromMainDispatcher(R.string.loggedIn)
+                            setFragmentResult(
+                                INSTANCE_DIALOG_REQUEST_KEY,
+                                bundleOf(IntentData.loginTask to true)
+                            )
+                            dialog?.dismiss()
+                        }
+                    } else {
+                        context?.toastFromMainDispatcher(R.string.error)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG(), "Google sign in failed", e)
+                context?.toastFromMainDispatcher(R.string.error)
+            }
+        }
+    }
+
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val binding = DialogLoginBinding.inflate(layoutInflater)
 
@@ -38,6 +69,10 @@ class LoginDialog : DialogFragment() {
             .setView(binding.root)
             .show()
             .apply {
+                binding.googleLoginButton.setOnClickListener {
+                    googleSignInLauncher.launch(com.github.libretube.helpers.GoogleAuthManager.getSignInIntent(requireContext()))
+                }
+
                 getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener {
                     val email = binding.username.text?.toString()
                     val password = binding.password.text?.toString()

@@ -9,6 +9,7 @@ import com.github.libretube.LibreTubeApp
 import com.github.libretube.R
 import com.github.libretube.api.TrendingCategory
 import com.github.libretube.constants.PreferenceKeys
+import com.github.libretube.enums.AccountType
 import com.github.libretube.enums.SbSkipOptions
 import com.github.libretube.helpers.LocaleHelper.getDetectedCountry
 
@@ -230,6 +231,19 @@ object PreferenceHelper {
 
     fun setUsername(newValue: String) {
         authSettings.edit { putString(PreferenceKeys.USERNAME, newValue) }
+    }
+
+    fun getAccountType(): AccountType {
+        val typeName = authSettings.getString(PreferenceKeys.ACCOUNT_TYPE, AccountType.PIPED.name)
+        return try {
+            AccountType.valueOf(typeName!!)
+        } catch (e: Exception) {
+            AccountType.PIPED
+        }
+    }
+
+    fun setAccountType(type: AccountType) {
+        authSettings.edit { putString(PreferenceKeys.ACCOUNT_TYPE, type.name) }
     }
 
     fun updateLastFeedWatchedTime(time: Long, seenByUser: Boolean) {

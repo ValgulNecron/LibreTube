@@ -34,6 +34,7 @@ paging = "3.4.0"
 collection = "1.5.0"
 swiperefreshlayout = "1.2.0"
 splashscreen = "1.2.0"
+playServicesAuth = "21.0.0"
 
 [libraries]
 androidx-activity = { group = "androidx.activity", name = "activity-ktx", version.ref = "activity" }
@@ -82,6 +83,7 @@ androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profi
 androidx-paging = { group = "androidx.paging", name = "paging-runtime-ktx", version.ref = "paging" }
 androidx-collection = { group = "androidx.collection", name = "collection", version.ref = "collection" }
 androidx-swiperefreshlayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "swiperefreshlayout" }
+play-services-auth = { group = "com.google.android.gms", name = "play-services-auth", version.ref = "playServicesAuth" }
 
 [plugins]
 androidTest = { id = "com.android.test", version.ref = "gradle" }

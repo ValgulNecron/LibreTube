@@ -8,6 +8,7 @@ object PreferenceKeys {
     // Authentications
     const val TOKEN = "token"
     const val USERNAME = "username"
+    const val ACCOUNT_TYPE = "account_type"
 
     // General
     const val LANGUAGE = "language"

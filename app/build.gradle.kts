@@ -176,6 +176,9 @@ dependencies {
     /* AndroidX Paging */
     implementation(libs.androidx.paging)
 
+    /* Google Sign-In */
+    implementation(libs.play.services.auth)
+
     /* Testing */
     testImplementation(libs.junit)
 }

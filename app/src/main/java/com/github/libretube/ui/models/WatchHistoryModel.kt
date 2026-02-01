@@ -55,6 +55,10 @@ class WatchHistoryModel : ViewModel() {
         if (isLoading) return@launch
         isLoading = true
 
+        if (currentPage == 1) {
+            com.github.libretube.helpers.GoogleHistorySync.syncHistory()
+        }
+
         val newHistory = withContext(Dispatchers.IO) {
             DatabaseHelper.getWatchHistoryPage(currentPage, HISTORY_PAGE_SIZE)
         }

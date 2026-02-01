@@ -2,6 +2,7 @@ package com.github.libretube.api
 
 import com.github.libretube.BuildConfig
 import com.github.libretube.constants.PreferenceKeys
+import com.github.libretube.enums.AccountType
 import com.github.libretube.helpers.PreferenceHelper
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
@@ -35,7 +36,13 @@ object RetrofitInstance {
     val httpClient by lazy { buildClient() }
 
     val authApi by resettableLazy(apiLazyMgr) {
-        buildRetrofitInstance<PipedAuthApi>(authUrl)
+        if (PreferenceHelper.getAccountType() == AccountType.GOOGLE) {
+            val youTubeApi = buildRetrofitInstance<YouTubeAuthApi>("https://www.googleapis.com/youtube/v3/")
+            val pipedApi = buildRetrofitInstance<PipedAuthApi>(authUrl)
+            GooglePipedAuthApi(youTubeApi, pipedApi)
+        } else {
+            buildRetrofitInstance<PipedAuthApi>(authUrl)
+        }
     }
 
     // the url provided here isn't actually used anywhere in the external api
@@ -51,6 +58,8 @@ object RetrofitInstance {
 
             httpClient.addInterceptor(loggingInterceptor)
         }
+
+        httpClient.authenticator(GoogleAuthenticator())
 
         return httpClient.build()
     }
