@@ -598,6 +598,7 @@
     <string name="google_import_subs_success">Successfully imported %1$d subscriptions from YouTube.</string>
     <string name="google_import_subs_failed">Failed to import subscriptions: %1$s</string>
     <string name="google_privacy_warning">Privacy notice</string>
-    <string name="google_privacy_warning_message">Connecting a Google account requires communicating with Google servers. This will share your IP address with Google. Your YouTube viewing data from LibreTube is not shared.</string>
+    <string name="google_privacy_warning_message">Connecting a Google account requires communicating with Google servers. This will share your IP address with Google. Your YouTube viewing data from LibreTube is not shared.\n\nWorks with Google Play Services, microG, or without any Google services (via browser).</string>
     <string name="google_not_connected">Google account not connected</string>
+    <string name="google_browser_sign_in_launched">Opening browser for Google sign-in. Complete the sign-in there.</string>
 </resources>

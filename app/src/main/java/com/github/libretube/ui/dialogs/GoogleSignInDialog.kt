@@ -19,8 +19,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
 /**
- * Dialog that handles Google Sign-In using Android Credential Manager.
- * Shows a privacy warning before proceeding with the sign-in flow.
+ * Dialog that handles Google Sign-In.
+ *
+ * Shows a privacy warning, then attempts sign-in via two strategies:
+ * 1. Credential Manager (if GMS/microG available) - native account picker
+ * 2. Browser-based OAuth2 (fallback) - opens Google consent page in browser
+ *
+ * The browser flow completes asynchronously via [GoogleOAuthRedirectActivity],
+ * while the Credential Manager flow completes within this dialog.
  */
 class GoogleSignInDialog : DialogFragment() {
 
@@ -41,41 +47,24 @@ class GoogleSignInDialog : DialogFragment() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                val response = GoogleAuthHelper.signIn(activity, googleClientId)
-                val result = GoogleAuthHelper.processCredentialResponse(response)
+                when (val result = GoogleAuthHelper.signIn(activity, googleClientId)) {
+                    is GoogleAuthHelper.SignInResult.CredentialManagerSuccess -> {
+                        handleCredentialManagerSuccess(result, googleClientId)
+                    }
 
-                if (result == null) {
-                    context?.toastFromMainDispatcher(
-                        getString(R.string.google_sign_in_failed, "Invalid credential")
-                    )
-                    return@launch
+                    is GoogleAuthHelper.SignInResult.BrowserFlowLaunched -> {
+                        // Browser was opened - auth will complete via GoogleOAuthRedirectActivity.
+                        context?.toastFromMainDispatcher(
+                            getString(R.string.google_browser_sign_in_launched)
+                        )
+                    }
+
+                    is GoogleAuthHelper.SignInResult.Failed -> {
+                        context?.toastFromMainDispatcher(
+                            getString(R.string.google_sign_in_failed, result.error)
+                        )
+                    }
                 }
-
-                val (idToken, email) = result
-
-                // Try to exchange the ID token for an access token
-                val tokenResponse = GoogleAuthHelper.exchangeIdTokenForAccessToken(
-                    idToken, googleClientId
-                )
-
-                if (tokenResponse.access_token != null) {
-                    GoogleAuthHelper.saveTokens(tokenResponse, email)
-                } else {
-                    // Even if token exchange fails, store the email and ID token
-                    // The user can still use the import features via alternative auth
-                    PreferenceHelper.setGoogleEmail(email)
-                    PreferenceHelper.setGoogleAccessToken(idToken)
-                    PreferenceHelper.setGoogleTokenExpiry(
-                        System.currentTimeMillis() + 3600_000 // 1 hour default
-                    )
-                }
-
-                context?.toastFromMainDispatcher(R.string.google_sign_in_success)
-
-                setFragmentResult(
-                    INSTANCE_DIALOG_REQUEST_KEY,
-                    bundleOf(IntentData.googleLoginTask to true)
-                )
             } catch (e: Exception) {
                 Log.e(TAG(), "Google Sign-In failed", e)
                 context?.toastFromMainDispatcher(
@@ -83,5 +72,36 @@ class GoogleSignInDialog : DialogFragment() {
                 )
             }
         }
+    }
+
+    private suspend fun handleCredentialManagerSuccess(
+        result: GoogleAuthHelper.SignInResult.CredentialManagerSuccess,
+        googleClientId: String
+    ) {
+        val (idToken, email) = result
+
+        // Try to exchange the ID token for an access token
+        val tokenResponse = GoogleAuthHelper.exchangeIdTokenForAccessToken(
+            idToken, googleClientId
+        )
+
+        if (tokenResponse.access_token != null) {
+            GoogleAuthHelper.saveTokens(tokenResponse, email)
+        } else {
+            // Even if token exchange fails, store the email and ID token
+            // so the user can use the browser-based flow as a retry
+            PreferenceHelper.setGoogleEmail(email)
+            PreferenceHelper.setGoogleAccessToken(idToken)
+            PreferenceHelper.setGoogleTokenExpiry(
+                System.currentTimeMillis() + 3600_000 // 1 hour default
+            )
+        }
+
+        context?.toastFromMainDispatcher(R.string.google_sign_in_success)
+
+        setFragmentResult(
+            INSTANCE_DIALOG_REQUEST_KEY,
+            bundleOf(IntentData.googleLoginTask to true)
+        )
     }
 }

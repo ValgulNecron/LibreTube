@@ -313,6 +313,23 @@
 
         </activity-alias>
 
+        <!-- OAuth2 redirect handler for browser-based Google Sign-In (microG compatible) -->
+        <activity
+            android:name=".ui.activities.GoogleOAuthRedirectActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:host="oauth2callback"
+                    android:scheme="com.github.libretube" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".ui.activities.RouterActivity"
             android:exported="true"

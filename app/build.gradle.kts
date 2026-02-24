@@ -180,10 +180,11 @@ dependencies {
     /* AndroidX Paging */
     implementation(libs.androidx.paging)
 
-    /* Google Sign-In (Credential Manager) */
+    /* Google Sign-In (Credential Manager + browser fallback) */
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play)
     implementation(libs.google.id.identity)
+    implementation(libs.androidx.browser)
 
     /* Testing */
     testImplementation(libs.junit)

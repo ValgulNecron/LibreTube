@@ -250,6 +250,26 @@ class InstanceSettings : BasePreferenceFragment() {
         }
     }
 
+    /**
+     * Refresh Google account UI state when returning from browser-based OAuth flow.
+     * The browser flow completes via GoogleOAuthRedirectActivity which stores the tokens,
+     * then the user navigates back here.
+     */
+    override fun onResume() {
+        super.onResume()
+
+        val isGoogleConnected = PreferenceHelper.isGoogleAccountConnected()
+        findPreference<Preference>(PreferenceKeys.GOOGLE_SIGN_IN)?.isVisible = !isGoogleConnected
+        findPreference<Preference>(PreferenceKeys.GOOGLE_SIGN_OUT)?.apply {
+            isVisible = isGoogleConnected
+            summary = if (isGoogleConnected) {
+                getString(R.string.google_signed_in_as, PreferenceHelper.getGoogleEmail())
+            } else null
+        }
+        findPreference<Preference>(PreferenceKeys.GOOGLE_IMPORT_SUBS)?.isEnabled = isGoogleConnected
+        findPreference<Preference>(PreferenceKeys.GOOGLE_IMPORT_HISTORY)?.isEnabled = isGoogleConnected
+    }
+
     private fun initInstancesPref(instancePrefs: List<ListPreference>) = runCatching {
         // add the currently used instances to the list if they're currently down / not part
         // of the public instances list

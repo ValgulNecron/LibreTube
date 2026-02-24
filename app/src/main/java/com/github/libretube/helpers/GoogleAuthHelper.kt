@@ -1,7 +1,11 @@
 package com.github.libretube.helpers
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.util.Log
+import androidx.browser.customtabs.CustomTabsIntent
+import androidx.core.net.toUri
 import androidx.credentials.ClearCredentialStateRequest
 import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
@@ -18,17 +22,20 @@ import okhttp3.FormBody
 import okhttp3.Request
 
 /**
- * Helper class for Google OAuth2 authentication using Android Credential Manager.
+ * Helper class for Google OAuth2 authentication.
  *
- * The flow works as follows:
- * 1. User taps "Sign in with Google" -> launches Credential Manager
- * 2. User selects a Google account -> we receive an ID token
- * 3. We exchange the ID token for OAuth2 access + refresh tokens using Google's token endpoint
- * 4. Access token is used for YouTube Data API calls (subscriptions, history)
- * 5. Refresh token is stored to obtain new access tokens when they expire
+ * Supports two authentication strategies:
  *
- * The OAuth2 client ID and secret must be configured for the app. For open-source builds,
- * users can provide their own credentials via the google_client_id string resource.
+ * 1. **Credential Manager** (preferred) - Uses Android's Credential Manager API with
+ *    Google Identity. Requires Google Play Services or a compatible microG installation.
+ *
+ * 2. **Browser-based OAuth2** (fallback) - Opens Google's consent page in a browser or
+ *    Custom Tab. Works on any device, including those with microG or no Google services.
+ *    The auth code is captured via a custom URI scheme redirect handled by
+ *    [com.github.libretube.ui.activities.GoogleOAuthRedirectActivity].
+ *
+ * The sign-in flow automatically tries Credential Manager first and falls back to
+ * the browser flow if it fails (e.g. no GMS available).
  */
 object GoogleAuthHelper {
     private const val TAG = "GoogleAuthHelper"
@@ -44,6 +51,11 @@ object GoogleAuthHelper {
      */
     private const val YOUTUBE_SCOPE = "https://www.googleapis.com/auth/youtube.readonly"
 
+    /**
+     * Custom URI scheme redirect for browser-based OAuth2 flow.
+     */
+    const val REDIRECT_URI = "com.github.libretube:/oauth2callback"
+
     @Serializable
     data class TokenResponse(
         val access_token: String? = null,
@@ -56,10 +68,55 @@ object GoogleAuthHelper {
     )
 
     /**
-     * Initiates Google Sign-In using Credential Manager and returns the credential response.
-     * This must be called from an Activity context for the system UI to display.
+     * Result of a sign-in attempt.
+     */
+    sealed class SignInResult {
+        /** Sign-in completed via Credential Manager. Contains ID token and email. */
+        data class CredentialManagerSuccess(val idToken: String, val email: String) : SignInResult()
+
+        /** Browser-based OAuth flow was launched. The result will arrive via the redirect activity. */
+        data object BrowserFlowLaunched : SignInResult()
+
+        /** Sign-in failed entirely. */
+        data class Failed(val error: String) : SignInResult()
+    }
+
+    /**
+     * Attempt sign-in using Credential Manager first, falling back to browser-based OAuth2.
+     *
+     * On devices with Google Play Services or a compatible microG, the Credential Manager
+     * will show a native account picker. On devices without these, the browser-based flow
+     * opens Google's consent page.
      */
     suspend fun signIn(
+        context: Context,
+        googleClientId: String
+    ): SignInResult {
+        // Strategy 1: Try Credential Manager (GMS / microG with CM support)
+        try {
+            val response = signInWithCredentialManager(context, googleClientId)
+            val result = processCredentialResponse(response) ?: return SignInResult.Failed(
+                "Invalid credential response"
+            )
+            return SignInResult.CredentialManagerSuccess(result.first, result.second)
+        } catch (e: Exception) {
+            Log.i(TAG, "Credential Manager unavailable, falling back to browser: ${e.message}")
+        }
+
+        // Strategy 2: Browser-based OAuth2 flow (works everywhere)
+        return try {
+            launchBrowserSignIn(context, googleClientId)
+            SignInResult.BrowserFlowLaunched
+        } catch (e: Exception) {
+            Log.e(TAG, "Browser sign-in also failed", e)
+            SignInResult.Failed(e.localizedMessage ?: "Sign-in failed")
+        }
+    }
+
+    /**
+     * Try Credential Manager (throws if GMS/microG is not available).
+     */
+    private suspend fun signInWithCredentialManager(
         context: Context,
         googleClientId: String
     ): GetCredentialResponse {
@@ -79,9 +136,7 @@ object GoogleAuthHelper {
     }
 
     /**
-     * Process the credential response from Google Sign-In.
-     * Extracts the ID token and email from the Google ID credential.
-     *
+     * Process the credential response from Credential Manager.
      * @return Pair of (idToken, email) or null if the credential is not a Google ID token
      */
     fun processCredentialResponse(response: GetCredentialResponse): Pair<String, String>? {
@@ -94,25 +149,48 @@ object GoogleAuthHelper {
         }
 
         val googleIdTokenCredential = GoogleIdTokenCredential.createFrom(credential.data)
-        val idToken = googleIdTokenCredential.idToken
-        val email = googleIdTokenCredential.id
+        return Pair(googleIdTokenCredential.idToken, googleIdTokenCredential.id)
+    }
 
-        return Pair(idToken, email)
+    /**
+     * Launch browser-based OAuth2 sign-in flow.
+     * This opens Google's consent page in a Custom Tab (preferred) or external browser.
+     * The auth code will be captured by [GoogleOAuthRedirectActivity] via the redirect URI.
+     */
+    fun launchBrowserSignIn(
+        context: Context,
+        googleClientId: String,
+        loginHint: String? = null
+    ) {
+        val authUrl = buildAuthorizationUrl(googleClientId, REDIRECT_URI, loginHint)
+
+        try {
+            // Prefer Custom Tabs for a better in-app experience
+            val customTabsIntent = CustomTabsIntent.Builder().build()
+            customTabsIntent.launchUrl(context, authUrl.toUri())
+        } catch (e: Exception) {
+            // Fallback to regular browser
+            val browserIntent = Intent(Intent.ACTION_VIEW, authUrl.toUri())
+            browserIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(browserIntent)
+        }
     }
 
     /**
      * Exchange an authorization code for access and refresh tokens.
-     * This uses Google's token endpoint with the authorization_code grant type.
+     * Used by both the Credential Manager flow (ID token exchange) and
+     * the browser flow (auth code exchange).
      */
     suspend fun exchangeAuthCode(
         authCode: String,
-        googleClientId: String
+        googleClientId: String,
+        redirectUri: String = ""
     ): TokenResponse = withContext(Dispatchers.IO) {
         val formBody = FormBody.Builder()
             .add("code", authCode)
             .add("client_id", googleClientId)
             .add("grant_type", "authorization_code")
-            .add("redirect_uri", "")
+            .add("redirect_uri", redirectUri)
             .build()
 
         val request = Request.Builder()
@@ -191,18 +269,12 @@ object GoogleAuthHelper {
      * Exchange a Google ID token for OAuth2 tokens that can access YouTube Data API.
      *
      * Since the Credential Manager gives us an ID token (not an authorization code),
-     * we use a server-side token exchange approach. The ID token proves the user's identity
-     * and can be used with Google's token endpoint when the app is configured with
-     * the appropriate OAuth client.
-     *
-     * For direct YouTube API access, we'll use the ID token to get an access token
-     * through Google's OAuth2 authorization flow.
+     * we use a JWT bearer assertion grant to exchange it for an access token.
      */
     suspend fun exchangeIdTokenForAccessToken(
         idToken: String,
         googleClientId: String
     ): TokenResponse = withContext(Dispatchers.IO) {
-        // Use the ID token exchange grant type
         val formBody = FormBody.Builder()
             .add("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
             .add("assertion", idToken)
@@ -226,15 +298,14 @@ object GoogleAuthHelper {
     }
 
     /**
-     * Build the OAuth2 authorization URL for the consent flow.
-     * This URL should be opened in a browser/Custom Tab for the user to grant YouTube access.
+     * Build the OAuth2 authorization URL for the browser consent flow.
      */
     fun buildAuthorizationUrl(
         googleClientId: String,
         redirectUri: String,
         loginHint: String? = null
     ): String {
-        val params = mutableMapOf(
+        val params = mutableListOf(
             "client_id" to googleClientId,
             "redirect_uri" to redirectUri,
             "response_type" to "code",
@@ -242,14 +313,17 @@ object GoogleAuthHelper {
             "access_type" to "offline",
             "prompt" to "consent"
         )
-        loginHint?.let { params["login_hint"] = it }
+        loginHint?.let { params.add("login_hint" to it) }
 
         return "https://accounts.google.com/o/oauth2/v2/auth?" +
-                params.entries.joinToString("&") { "${it.key}=${it.value}" }
+            params.joinToString("&") { (key, value) ->
+                "$key=${Uri.encode(value)}"
+            }
     }
 
     /**
      * Sign out from Google account and clear stored tokens.
+     * Attempts to clear Credential Manager state (safe to call even without GMS).
      */
     suspend fun signOut(context: Context) {
         PreferenceHelper.clearGoogleAuth()
@@ -257,7 +331,8 @@ object GoogleAuthHelper {
             val credentialManager = CredentialManager.create(context)
             credentialManager.clearCredentialState(ClearCredentialStateRequest())
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to clear credential state", e)
+            // Credential Manager may not be available (no GMS) - that's fine
+            Log.d(TAG, "Could not clear credential state (no GMS?): ${e.message}")
         }
     }
 
