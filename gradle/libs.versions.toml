@@ -34,6 +34,8 @@ paging = "3.4.1"
 collection = "1.5.0"
 swiperefreshlayout = "1.2.0"
 splashscreen = "1.2.0"
+credentialManager = "1.5.0"
+googleIdIdentity = "1.1.1"
 
 [libraries]
 androidx-activity = { group = "androidx.activity", name = "activity-ktx", version.ref = "activity" }
@@ -82,6 +84,9 @@ androidx-profileinstaller = { group = "androidx.profileinstaller", name = "profi
 androidx-paging = { group = "androidx.paging", name = "paging-runtime-ktx", version.ref = "paging" }
 androidx-collection = { group = "androidx.collection", name = "collection", version.ref = "collection" }
 androidx-swiperefreshlayout = { group = "androidx.swiperefreshlayout", name = "swiperefreshlayout", version.ref = "swiperefreshlayout" }
+androidx-credentials = { group = "androidx.credentials", name = "credentials", version.ref = "credentialManager" }
+androidx-credentials-play = { group = "androidx.credentials", name = "credentials-play-services-auth", version.ref = "credentialManager" }
+google-id-identity = { group = "com.google.android.libraries.identity.googleid", name = "googleid", version.ref = "googleIdIdentity" }
 
 [plugins]
 androidTest = { id = "com.android.test", version.ref = "gradle" }

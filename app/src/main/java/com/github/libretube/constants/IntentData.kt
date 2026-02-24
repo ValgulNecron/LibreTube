@@ -32,6 +32,8 @@ object IntentData {
     const val playlistTask = "playlistTask"
     const val loginTask = "loginTask"
     const val logoutTask = "logoutTask"
+    const val googleLoginTask = "googleLoginTask"
+    const val googleLogoutTask = "googleLogoutTask"
     const val color = "color"
     const val streamItem = "streamItem"
     const val url = "url"

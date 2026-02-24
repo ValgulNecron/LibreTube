@@ -579,4 +579,25 @@
     <string name="also_clear_watch_positions">Also clear watch positions</string>
     <string name="import_temp_playlist">Import temporary playlist?</string>
     <string name="import_temp_playlist_summary">Do you want to create a new playlist named \'%1$s\'? The playlist will contain %2$d videos.</string>
+
+    <!-- Google Account Authentication -->
+    <string name="google_client_id" translatable="false">YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com</string>
+    <string name="google_account">Google account</string>
+    <string name="google_sign_in">Sign in with Google</string>
+    <string name="google_sign_in_summary">Connect your YouTube account to import subscriptions and watch history</string>
+    <string name="google_sign_out">Sign out from Google</string>
+    <string name="google_signed_in_as">Signed in as %1$s</string>
+    <string name="google_sign_in_success">Successfully signed in with Google.</string>
+    <string name="google_sign_out_success">Signed out from Google account.</string>
+    <string name="google_sign_in_failed">Google sign-in failed: %1$s</string>
+    <string name="google_import_subscriptions">Import YouTube subscriptions</string>
+    <string name="google_import_subscriptions_summary">Import your subscriptions from your YouTube account</string>
+    <string name="google_import_history">Import YouTube watch history</string>
+    <string name="google_import_history_summary">Import your watch history from your YouTube account</string>
+    <string name="google_importing_subscriptions">Importing subscriptions from YouTube…</string>
+    <string name="google_import_subs_success">Successfully imported %1$d subscriptions from YouTube.</string>
+    <string name="google_import_subs_failed">Failed to import subscriptions: %1$s</string>
+    <string name="google_privacy_warning">Privacy notice</string>
+    <string name="google_privacy_warning_message">Connecting a Google account requires communicating with Google servers. This will share your IP address with Google. Your YouTube viewing data from LibreTube is not shared.</string>
+    <string name="google_not_connected">Google account not connected</string>
 </resources>

@@ -7,6 +7,8 @@ import com.github.libretube.helpers.PreferenceHelper
 import com.github.libretube.repo.AccountSubscriptionsRepository
 import com.github.libretube.repo.FeedProgress
 import com.github.libretube.repo.FeedRepository
+import com.github.libretube.repo.GoogleAccountFeedRepository
+import com.github.libretube.repo.GoogleAccountSubscriptionsRepository
 import com.github.libretube.repo.LocalFeedRepository
 import com.github.libretube.repo.LocalSubscriptionsRepository
 import com.github.libretube.repo.PipedAccountFeedRepository
@@ -27,14 +29,18 @@ object SubscriptionHelper {
             false
         )
     private val token get() = PreferenceHelper.getToken()
+    private val isGoogleConnected get() = PreferenceHelper.isGoogleAccountConnected()
+
     private val subscriptionsRepository: SubscriptionsRepository
         get() = when {
+            isGoogleConnected -> GoogleAccountSubscriptionsRepository()
             token.isNotEmpty() -> AccountSubscriptionsRepository()
             localFeedExtraction -> LocalSubscriptionsRepository()
             else -> PipedLocalSubscriptionsRepository()
         }
     private val feedRepository: FeedRepository
         get() = when {
+            isGoogleConnected -> GoogleAccountFeedRepository()
             localFeedExtraction -> LocalFeedRepository()
             token.isNotEmpty() -> PipedAccountFeedRepository()
             else -> PipedNoAccountFeedRepository()

@@ -130,6 +130,11 @@
 -dontwarn jdk.dynalink.**
 -dontwarn com.google.re2j.**
 
+## Rules for Google Credential Manager / Google Sign-In
+-keep class com.google.android.libraries.identity.googleid.** { *; }
+-keep class androidx.credentials.** { *; }
+-dontwarn com.google.android.libraries.identity.googleid.**
+
 # This is generated automatically by the Android Gradle plugin.
 -dontwarn java.beans.BeanDescriptor
 -dontwarn java.beans.BeanInfo

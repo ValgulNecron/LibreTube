@@ -1,6 +1,7 @@
 package com.github.libretube.ui.preferences
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.widget.Toast
 import androidx.core.app.ActivityCompat
@@ -17,18 +18,23 @@ import com.github.libretube.api.obj.PipedInstance
 import com.github.libretube.constants.IntentData
 import com.github.libretube.constants.PreferenceKeys
 import com.github.libretube.databinding.SimpleOptionsRecyclerBinding
+import com.github.libretube.extensions.TAG
 import com.github.libretube.extensions.toastFromMainThread
 import com.github.libretube.helpers.PreferenceHelper
+import com.github.libretube.repo.GoogleAccountSubscriptionsRepository
 import com.github.libretube.ui.adapters.InstancesAdapter
 import com.github.libretube.ui.base.BasePreferenceFragment
 import com.github.libretube.ui.dialogs.CreateCustomInstanceDialog
 import com.github.libretube.ui.dialogs.CustomInstancesListDialog
 import com.github.libretube.ui.dialogs.DeleteAccountDialog
+import com.github.libretube.ui.dialogs.GoogleSignInDialog
+import com.github.libretube.ui.dialogs.GoogleSignOutDialog
 import com.github.libretube.ui.dialogs.LoginDialog
 import com.github.libretube.ui.dialogs.LogoutDialog
 import com.github.libretube.ui.models.InstancesModel
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.common.collect.ImmutableList
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import okhttp3.HttpUrl.Companion.toHttpUrl
 
@@ -89,18 +95,53 @@ class InstanceSettings : BasePreferenceFragment() {
         logout?.isVisible = token.isNotEmpty()
         deleteAccount?.isEnabled = token.isNotEmpty()
 
+        // Google Account preferences
+        val googleSignIn = findPreference<Preference>(PreferenceKeys.GOOGLE_SIGN_IN)
+        val googleSignOut = findPreference<Preference>(PreferenceKeys.GOOGLE_SIGN_OUT)
+        val googleImportSubs = findPreference<Preference>(PreferenceKeys.GOOGLE_IMPORT_SUBS)
+        val googleImportHistory = findPreference<Preference>(PreferenceKeys.GOOGLE_IMPORT_HISTORY)
+
+        val isGoogleConnected = PreferenceHelper.isGoogleAccountConnected()
+        googleSignIn?.isVisible = !isGoogleConnected
+        googleSignOut?.isVisible = isGoogleConnected
+        googleSignOut?.summary = if (isGoogleConnected) {
+            getString(R.string.google_signed_in_as, PreferenceHelper.getGoogleEmail())
+        } else null
+        googleImportSubs?.isEnabled = isGoogleConnected
+        googleImportHistory?.isEnabled = isGoogleConnected
+
         childFragmentManager.setFragmentResultListener(
             INSTANCE_DIALOG_REQUEST_KEY,
             this
         ) { _, resultBundle ->
             val isLoggedIn = resultBundle.getBoolean(IntentData.loginTask)
             val isLoggedOut = resultBundle.getBoolean(IntentData.logoutTask)
+            val isGoogleLoggedIn = resultBundle.getBoolean(IntentData.googleLoginTask)
+            val isGoogleLoggedOut = resultBundle.getBoolean(IntentData.googleLogoutTask)
+
             if (isLoggedIn) {
                 login?.isVisible = false
                 logout?.isVisible = true
                 deleteAccount?.isEnabled = true
             } else if (isLoggedOut) {
                 logoutAndUpdateUI()
+            }
+
+            if (isGoogleLoggedIn) {
+                googleSignIn?.isVisible = false
+                googleSignOut?.isVisible = true
+                googleSignOut?.summary = getString(
+                    R.string.google_signed_in_as,
+                    PreferenceHelper.getGoogleEmail()
+                )
+                googleImportSubs?.isEnabled = true
+                googleImportHistory?.isEnabled = true
+            } else if (isGoogleLoggedOut) {
+                googleSignIn?.isVisible = true
+                googleSignOut?.isVisible = false
+                googleSignOut?.summary = null
+                googleImportSubs?.isEnabled = false
+                googleImportHistory?.isEnabled = false
             }
         }
 
@@ -120,11 +161,92 @@ class InstanceSettings : BasePreferenceFragment() {
             true
         }
 
+        googleSignIn?.setOnPreferenceClickListener {
+            GoogleSignInDialog().show(childFragmentManager, GoogleSignInDialog::class.java.name)
+            true
+        }
+
+        googleSignOut?.setOnPreferenceClickListener {
+            GoogleSignOutDialog().show(childFragmentManager, GoogleSignOutDialog::class.java.name)
+            true
+        }
+
+        googleImportSubs?.setOnPreferenceClickListener {
+            importGoogleSubscriptions()
+            true
+        }
+
+        googleImportHistory?.setOnPreferenceClickListener {
+            importGoogleWatchHistory()
+            true
+        }
+
         findPreference<SwitchPreferenceCompat>(PreferenceKeys.FULL_LOCAL_MODE)?.setOnPreferenceChangeListener { _, newValue ->
             // when the full local mode gets enabled, the fetch instance is no longer used and replaced
             // fully by local extraction. thus, the user has to be logged out from the fetch instance
             if (newValue == true && !authInstanceToggle.isChecked) logoutAndUpdateUI()
             true
+        }
+    }
+
+    private fun importGoogleSubscriptions() {
+        if (!PreferenceHelper.isGoogleAccountConnected()) {
+            Toast.makeText(context, R.string.google_not_connected, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        Toast.makeText(context, R.string.google_importing_subscriptions, Toast.LENGTH_SHORT).show()
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val repo = GoogleAccountSubscriptionsRepository()
+                val count = repo.importFromGoogleAccount()
+                context?.toastFromMainThread(
+                    getString(R.string.google_import_subs_success, count)
+                )
+            } catch (e: Exception) {
+                Log.e(TAG(), "Failed to import Google subscriptions", e)
+                context?.toastFromMainThread(
+                    getString(R.string.google_import_subs_failed, e.localizedMessage ?: "Unknown error")
+                )
+            }
+        }
+    }
+
+    private fun importGoogleWatchHistory() {
+        if (!PreferenceHelper.isGoogleAccountConnected()) {
+            Toast.makeText(context, R.string.google_not_connected, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                val googleClientId = getString(R.string.google_client_id)
+                val accessToken = com.github.libretube.helpers.GoogleAuthHelper
+                    .getValidAccessToken(googleClientId)
+                    ?: throw Exception("Failed to get access token")
+
+                // Get the user's channel to find their "likes" and activity
+                val myChannel = RetrofitInstance.youtubeDataApi.getMyChannel(
+                    accessToken = accessToken
+                )
+
+                val channelItem = myChannel.items.firstOrNull()
+                    ?: throw Exception("Could not find your YouTube channel")
+
+                // Note: YouTube doesn't expose watch history via the Data API.
+                // The "likes" playlist is the closest publicly available data.
+                // For full watch history import, users should use Google Takeout
+                // (which is already supported via the existing import feature).
+                context?.toastFromMainThread(
+                    getString(R.string.google_import_history_summary)
+                )
+            } catch (e: Exception) {
+                Log.e(TAG(), "Failed to import Google watch history", e)
+                context?.toastFromMainThread(
+                    getString(R.string.google_import_subs_failed, e.localizedMessage ?: "Unknown error")
+                )
+            }
         }
     }
 

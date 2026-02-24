@@ -9,6 +9,17 @@ object PreferenceKeys {
     const val TOKEN = "token"
     const val USERNAME = "username"
 
+    // Google Account Authentication
+    const val GOOGLE_ACCOUNT_ENABLED = "google_account_enabled"
+    const val GOOGLE_ACCESS_TOKEN = "google_access_token"
+    const val GOOGLE_REFRESH_TOKEN = "google_refresh_token"
+    const val GOOGLE_TOKEN_EXPIRY = "google_token_expiry"
+    const val GOOGLE_EMAIL = "google_email"
+    const val GOOGLE_SIGN_IN = "google_sign_in"
+    const val GOOGLE_SIGN_OUT = "google_sign_out"
+    const val GOOGLE_IMPORT_SUBS = "google_import_subs"
+    const val GOOGLE_IMPORT_HISTORY = "google_import_history"
+
     // General
     const val LANGUAGE = "language"
     const val REGION = "region"

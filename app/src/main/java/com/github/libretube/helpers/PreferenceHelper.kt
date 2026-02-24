@@ -232,6 +232,51 @@ object PreferenceHelper {
         authSettings.edit { putString(PreferenceKeys.USERNAME, newValue) }
     }
 
+    fun isGoogleAccountConnected(): Boolean {
+        return authSettings.getString(PreferenceKeys.GOOGLE_ACCESS_TOKEN, "")!!.isNotEmpty()
+    }
+
+    fun getGoogleAccessToken(): String {
+        return authSettings.getString(PreferenceKeys.GOOGLE_ACCESS_TOKEN, "")!!
+    }
+
+    fun setGoogleAccessToken(token: String) {
+        authSettings.edit { putString(PreferenceKeys.GOOGLE_ACCESS_TOKEN, token) }
+    }
+
+    fun getGoogleRefreshToken(): String {
+        return authSettings.getString(PreferenceKeys.GOOGLE_REFRESH_TOKEN, "")!!
+    }
+
+    fun setGoogleRefreshToken(token: String) {
+        authSettings.edit { putString(PreferenceKeys.GOOGLE_REFRESH_TOKEN, token) }
+    }
+
+    fun getGoogleTokenExpiry(): Long {
+        return authSettings.getLong(PreferenceKeys.GOOGLE_TOKEN_EXPIRY, 0L)
+    }
+
+    fun setGoogleTokenExpiry(expiry: Long) {
+        authSettings.edit { putLong(PreferenceKeys.GOOGLE_TOKEN_EXPIRY, expiry) }
+    }
+
+    fun getGoogleEmail(): String {
+        return authSettings.getString(PreferenceKeys.GOOGLE_EMAIL, "")!!
+    }
+
+    fun setGoogleEmail(email: String) {
+        authSettings.edit { putString(PreferenceKeys.GOOGLE_EMAIL, email) }
+    }
+
+    fun clearGoogleAuth() {
+        authSettings.edit {
+            remove(PreferenceKeys.GOOGLE_ACCESS_TOKEN)
+            remove(PreferenceKeys.GOOGLE_REFRESH_TOKEN)
+            remove(PreferenceKeys.GOOGLE_TOKEN_EXPIRY)
+            remove(PreferenceKeys.GOOGLE_EMAIL)
+        }
+    }
+
     fun updateLastFeedWatchedTime(time: Long, seenByUser: Boolean) {
         // only update the time if the time is newer
         // this avoids cases, where the user last saw an older video, which had already been seen,
